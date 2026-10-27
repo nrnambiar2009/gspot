@@ -2,7 +2,8 @@
 
 ![GSpot beside a TextEdit draft: the Review panel lists the suggestions, the draft is underlined in place, and a card offers the fix](docs/hero.png)
 
-A local-first, open-source Grammarly-style writing assistant for macOS. A floating panel docked to the
+A local-first, open-source Grammarly-style writing assistant for macOS, with a Linux port in progress
+(Ubuntu 26.04, GNOME on Wayland; see [Linux status](#linux-status)). On macOS a floating panel docked to the
 left edge of the screen follows the text field you are typing in (any app), underlines issues in place,
 and runs the full sidebar of tools: suggestions, AI chat, plagiarism, tone, performance score,
 paraphraser, humanizer, reader reactions, translate, explain it, AI rewriter, AI detector.
@@ -34,7 +35,51 @@ tucks into the left. `dock_side` in Settings flips it.)
 
 See `docs/REVERSE-ENGINEERING.md` for what was learned from Grammarly Desktop and `docs/PLAN.md` for the gates.
 
-## Install
+## Linux status
+
+The Linux port follows the gates in the port plan. **Only gate L0 is done**, so this is a developer
+preview, not a drop-in replacement for the macOS app.
+
+| Gate | What | State |
+|---|---|---|
+| L0 | Compiles on Linux; panel opens; Harper runs on text typed into the panel | done |
+| L1 | Read the focused field of other apps through AT-SPI | not started |
+| L2 | Accept a suggestion in the other app (AT-SPI edit, paste fallback), verified by read-back | not started |
+| L3 | Underlines in place where the compositor gives valid coordinates, else panel-only | not started |
+| L4 | Autostart, tray handling, `.deb` package | not started |
+
+What works today: the panel, the Harper correctness engine and the unit tests. The AI features (spot check, chat, rewriter and the
+rest) are not available on Linux yet. The Review view has a text box on Linux: type or paste text and the suggestions appear, and
+Accept edits that text. What does not work yet: following the text field of another app, replacing text in
+other apps, underlines in place, the tray icon on stock GNOME, and a `.deb`.
+
+The window layer runs under XWayland (`GDK_BACKEND=x11`) because GNOME on Wayland lets an app neither place
+nor stack its own windows globally. Expect in-place underlines to work in X11 apps and some Wayland apps;
+the panel with click-to-accept suggestions is the fallback everywhere else.
+
+### Build and run on Linux
+
+Needs Rust (via [rustup](https://rustup.rs)), Node 22, and pnpm.
+
+```bash
+sudo apt install build-essential curl wget file libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+  libayatana-appindicator3-dev librsvg2-dev libatspi2.0-dev
+pnpm install
+cd src-tauri && ../ui/node_modules/.bin/tauri build --debug --no-bundle
+GDK_BACKEND=x11 ./target/debug/grammarlama
+```
+
+`pnpm dev` gives hot reload. Set `GRAMMARLAMA_DEBUG_PORT=47811` to get the loopback probe; on Linux
+`curl -XPOST localhost:47811/check -d '{"text":"..."}'` lints text as if it were typed in the panel, and
+`/state` and `/accept` work on it.
+
+## License
+
+AGPL-3.0, see `LICENSE`. If you distribute a modified build or let others use it over a network, you must
+publish your source under the same license. The UI imitates Grammarly's look; rebrand it before you
+distribute your own build.
+
+## Install (macOS)
 
 GSpot is listed on [publik](https://publikhq.com/gspot).
 
@@ -46,7 +91,7 @@ GSpot is listed on [publik](https://publikhq.com/gspot).
 GSpot lives in the menu bar and as a tab on the left screen edge. AI features run through publik API by
 default; the first use shows a two-sentence disclosure and mints a key for this computer.
 
-## Build
+## Build (macOS)
 
 ```bash
 pnpm install        # installs ui/ as well (postinstall)
@@ -64,6 +109,8 @@ offers your own key. `PUBLIK_SELF_TEST=1 /Applications/GSpot.app/Contents/MacOS/
 line that proves the publik API wiring of a built app.
 
 ## Test
+
+The e2e scripts below drive TextEdit and need macOS. On Linux, run the two unit test suites.
 
 ```bash
 cd ui && pnpm test                         # TypeScript unit tests

@@ -2,12 +2,21 @@
 //! Native Tauri host + Harper engine + Accessibility overlays + LLM features.
 
 pub mod aiphrases;
+#[cfg(target_os = "macos")]
 pub mod apply;
+#[cfg(not(target_os = "macos"))]
+#[path = "apply_stub.rs"]
+pub mod apply;
+#[cfg(target_os = "macos")]
+pub mod ax;
+#[cfg(not(target_os = "macos"))]
+#[path = "ax_stub.rs"]
 pub mod ax;
 pub mod commands;
 pub mod debug_server;
 pub mod engine;
 pub mod features;
+pub mod geom;
 pub mod history;
 pub mod host;
 pub mod llm;
@@ -45,7 +54,8 @@ pub fn run() {
             overlay::create_windows(&handle, &dock_side)?;
             // Start tucked behind the edge tab, like Grammarly. First run (no
             // Accessibility yet) starts open so the permission gate is visible.
-            overlay::set_tucked(&handle, &dock_side, ax::is_trusted(), false, false);
+            // No focus watcher on Linux yet, so start with the panel open there.
+            overlay::set_tucked(&handle, &dock_side, cfg!(target_os = "macos") && ax::is_trusted(), false, false);
 
             let open = MenuItem::with_id(app, "open", "Open GSpot", true, None::<&str>)?;
             let perms = MenuItem::with_id(app, "perms", "Accessibility permission…", true, None::<&str>)?;
@@ -82,6 +92,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_state,
+            commands::check_text,
             commands::accept_alert,
             commands::dismiss_alert,
             commands::replace_range,

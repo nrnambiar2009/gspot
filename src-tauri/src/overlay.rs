@@ -225,6 +225,11 @@ pub fn create_windows(app: &AppHandle, side: &str) -> tauri::Result<()> {
         .visible_on_all_workspaces(true)
         .visible(false)
         .build()?;
+    // GTK has not realized a hidden window yet and tao unwraps its GdkWindow, so on Linux
+    // click-through is applied when the layer is first shown (gate L3).
+    #[cfg(target_os = "macos")]
     let _ = u.set_ignore_cursor_events(true);
+    #[cfg(not(target_os = "macos"))]
+    let _ = u;
     Ok(())
 }

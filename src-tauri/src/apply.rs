@@ -17,6 +17,8 @@ use std::time::Duration;
 pub enum Method {
     Ax,
     Paste,
+    /// Edited the panel's own text box.
+    Panel,
 }
 
 #[derive(Clone, Debug, Serialize)]

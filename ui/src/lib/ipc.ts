@@ -11,6 +11,7 @@ const invoke: typeof tauriInvoke = hasTauri
 
 export const ipc = {
   getState: () => invoke<AppState>("get_state"),
+  checkText: (text: string) => invoke<void>("check_text", { text }),
   acceptAlert: (id: string, suggestion = 0) => invoke<{ method: string; new_text: string }>("accept_alert", { id, suggestion }),
   dismissAlert: (id: string) => invoke<void>("dismiss_alert", { id }),
   replaceRange: (start: number, end: number, text: string) => invoke<{ method: string; new_text: string }>("replace_range", { start, end, text }),

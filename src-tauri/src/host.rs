@@ -1,16 +1,21 @@
 //! The host loop: watches the focused text field of whatever app is in front,
 //! keeps the document model, runs the engine, and computes underline geometry.
 
-#![cfg(target_os = "macos")]
-
 use crate::ax::{self, AXElement, Rect};
-use crate::engine::{Alert, Engine};
+use crate::engine::Alert;
+#[cfg(target_os = "macos")]
+use crate::engine::Engine;
+#[cfg(target_os = "macos")]
 use crate::score;
 use crate::settings::Settings;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager};
+#[cfg(target_os = "macos")]
+use std::time::Duration;
+use std::time::Instant;
+#[cfg(target_os = "macos")]
+use tauri::{Emitter, Manager};
+use tauri::AppHandle;
 
 pub const OUR_BUNDLE: &str = "com.publik.grammarlama";
 
@@ -39,14 +44,21 @@ pub fn built_in_skip(bundle_id: &str) -> bool {
 pub fn skipped_app(bundle_id: &str, settings: &crate::settings::Settings) -> bool {
     !bundle_id.is_empty() && (built_in_skip(bundle_id) || settings.skip_apps.iter().any(|a| a.bundle_id == bundle_id))
 }
+#[cfg(target_os = "macos")]
 const POLL: Duration = Duration::from_millis(220);
+#[cfg(target_os = "macos")]
 const LINT_DEBOUNCE: Duration = Duration::from_millis(350);
 /// Typing pause before the model judges the changed sentences.
+#[cfg(target_os = "macos")]
 const SPOT_DEBOUNCE: Duration = Duration::from_millis(3500);
 /// Longer documents are spot-checked on demand only (the Spot check button).
+#[cfg(target_os = "macos")]
 const SPOT_MAX_WORDS: usize = 6000;
+#[cfg(target_os = "macos")]
 const MAX_CHARS: usize = 80_000;
+#[cfg(target_os = "macos")]
 const GBUTTON: f64 = 48.0;
+#[cfg(target_os = "macos")]
 const GBUTTON_INSET: f64 = 14.0;
 
 #[derive(Clone, Debug, Serialize)]
@@ -78,6 +90,8 @@ pub struct Status {
     pub skip_built_in: bool,
     pub has_doc: bool,
     pub linting: bool,
+    /// No focus watcher on this platform: the panel's own text box is the only document.
+    pub scratch: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -149,6 +163,7 @@ impl HostState {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn hash_text(s: &str) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -157,6 +172,7 @@ fn hash_text(s: &str) -> u64 {
     h.finish()
 }
 
+#[cfg(target_os = "macos")]
 fn is_editable(el: &AXElement, role: &str) -> bool {
     if role == "AXSecureTextField" {
         return false;
@@ -170,6 +186,7 @@ fn is_editable(el: &AXElement, role: &str) -> bool {
     el.has_attr("AXSelectedTextRange") && el.is_settable("AXValue")
 }
 
+#[cfg(target_os = "macos")]
 fn visible_frame(el: &AXElement, frame: Rect) -> Rect {
     let mut vis = frame;
     if let Some(sa) = el.enclosing_scroll_area() {
@@ -189,6 +206,7 @@ fn visible_frame(el: &AXElement, frame: Rect) -> Rect {
     vis
 }
 
+#[cfg(target_os = "macos")]
 pub fn spawn(app: AppHandle, shared: Shared) {
     std::thread::Builder::new()
         .name("host-loop".into())
@@ -209,6 +227,7 @@ pub fn spawn(app: AppHandle, shared: Shared) {
         .expect("host loop thread");
 }
 
+#[cfg(target_os = "macos")]
 fn tick(app: &AppHandle, shared: &Shared, system: &AXElement, engine: &mut Engine, last_geom_sig: &mut String, last_status_sig: &mut String) {
     let trusted = ax::is_trusted();
     let front = ax::frontmost_app();
@@ -515,6 +534,7 @@ fn tick(app: &AppHandle, shared: &Shared, system: &AXElement, engine: &mut Engin
 }
 
 /// Screen rects (one per visual line) for a UTF-16 range.
+#[cfg(target_os = "macos")]
 fn rects_for_range(el: &AXElement, loc: usize, len: usize) -> Vec<Rect> {
     let mut out = Vec::new();
     if len == 0 {
@@ -573,6 +593,15 @@ fn rects_for_range(el: &AXElement, loc: usize, len: usize) -> Vec<Rect> {
         }
     }
     out
+}
+
+/// No focus watcher on this platform yet: the panel still works on typed text.
+#[cfg(not(target_os = "macos"))]
+pub fn spawn(_app: AppHandle, shared: Shared) {
+    if let Ok(mut st) = shared.lock() {
+        st.status.trusted = ax::is_trusted();
+        st.status.scratch = true;
+    }
 }
 
 #[cfg(test)]

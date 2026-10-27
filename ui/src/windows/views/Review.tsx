@@ -38,6 +38,18 @@ export function alertMode(a: Alert): "replace" | "remove" | "note" {
   return a.suggestions[0] === "" ? "remove" : "replace";
 }
 
+/** Platforms with no focus watcher: the panel's own box is the document. */
+function ScratchBox({ ctx }: { ctx: Ctx }) {
+  const [text, setText] = useState(ctx.doc?.id === "gspot-panel" ? ctx.doc.text : "");
+  // Accepting a suggestion rewrites the text in the host; follow it.
+  useEffect(() => { if (ctx.doc?.id === "gspot-panel" && ctx.doc.text !== text) setText(ctx.doc.text); }, [ctx.doc?.version]);
+  useEffect(() => {
+    const t = window.setTimeout(() => { if (text !== (ctx.doc?.text ?? "")) ipc.checkText(text).catch((e) => ctx.toast(String(e))); }, 350);
+    return () => window.clearTimeout(t);
+  }, [text]);
+  return <textarea className="scratch" value={text} placeholder="Type or paste text to check" spellCheck={false} onChange={(e) => setText(e.target.value)} />;
+}
+
 export function Review({ ctx }: { ctx: Ctx }) {
   const [tab, setTab] = useState<Category>(initialTab);
   const [open, setOpen] = useState<string | null>(null);
@@ -68,11 +80,11 @@ export function Review({ ctx }: { ctx: Ctx }) {
   };
   useEffect(() => { if (ctx.spot_running) setSpotNote(null); }, [ctx.spot_running]);
 
-  if (!ctx.doc) return <NoDoc ctx={ctx} />;
+  if (!ctx.doc) return ctx.status.scratch ? <div className="panel__scroll"><ScratchBox ctx={ctx} /></div> : <NoDoc ctx={ctx} />;
 
   const accept = async (a: Alert, idx = 0) => {
     setBusy(a.id);
-    try { const r = await ipc.acceptAlert(a.id, idx); ctx.toast(r.method === "ax" ? "Applied" : "Applied via paste"); }
+    try { const r = await ipc.acceptAlert(a.id, idx); ctx.toast(r.method === "paste" ? "Applied via paste" : "Applied"); }
     catch (e) { ctx.toast(String(e)); }
     finally { setBusy(null); }
   };
@@ -95,6 +107,7 @@ export function Review({ ctx }: { ctx: Ctx }) {
             {running ? <div className="spin" style={{ width: 14, height: 14, borderWidth: 2 }} /> : <I.Sparkle style={{ width: 16, height: 16, color: "#7d99f0" }} />}{running ? "Checking" : "Spot check"}
           </button>
         </div>
+        {ctx.status.scratch && <ScratchBox ctx={ctx} />}
         <div className="review-app"><span>{ctx.doc.app_name || "This app"}</span><button className="linkbtn" title="GSpot stays out of this app until you turn it back on in Settings" onClick={skipApp}>Skip this app</button></div>
         {(spotNote || running) && <div className="review-note">{running ? "Checking your sentences with the model." : spotNote}</div>}
         <div className="cats">

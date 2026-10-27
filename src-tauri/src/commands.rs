@@ -20,12 +20,68 @@ fn doc_snapshot(shared: &Shared) -> Option<(HostDoc, crate::ax::AXElement)> {
     }
 }
 
+/// Document id of the panel's own text box (platforms without a focus watcher).
+pub const SCRATCH_ID: &str = "gspot-panel";
+
+/// Lint `text` as the panel's own document and publish it like a watched field.
+pub fn check_text_inner(app: &AppHandle, shared: &Shared, text: &str) {
+    static ENGINE: std::sync::OnceLock<std::sync::Mutex<crate::engine::Engine>> = std::sync::OnceLock::new();
+    let all = {
+        let mut e = ENGINE.get_or_init(|| std::sync::Mutex::new(crate::engine::Engine::new())).lock().unwrap();
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| e.check(text))).unwrap_or_default()
+    };
+    let end = text.encode_utf16().count();
+    let (doc, alerts) = {
+        let mut st = shared.lock().unwrap();
+        let version = st.doc.as_ref().map(|d| d.version).unwrap_or(0) + 1;
+        let doc = HostDoc {
+            id: SCRATCH_ID.into(),
+            app_name: "GSpot".into(),
+            bundle_id: crate::host::OUR_BUNDLE.into(),
+            pid: std::process::id() as i32,
+            role: "scratch".into(),
+            text: text.to_string(),
+            sel_start: end,
+            sel_end: end,
+            selected_text: String::new(),
+            frame: Default::default(),
+            visible: Default::default(),
+            version,
+            active: true,
+            truncated: false,
+        };
+        st.doc = Some(doc.clone());
+        st.status.has_doc = true;
+        st.all_alerts = all;
+        st.alerts = st.visible_alerts();
+        (doc, st.alerts.clone())
+    };
+    let _ = app.emit("host://document", &doc);
+    let _ = app.emit("host://alerts", &alerts);
+}
+
+/// Accept on the panel's own text: splice it here, no other app involved.
+fn accept_scratch(app: &AppHandle, shared: &Shared, alert: &Alert, replacement: &str) -> Result<crate::apply::ApplyResult, String> {
+    let before = shared.lock().unwrap().doc.as_ref().map(|d| d.text.clone()).ok_or("No text is open.")?;
+    let new_text = crate::textmap::splice_utf16(&before, alert.u16_start, alert.u16_end - alert.u16_start, replacement);
+    check_text_inner(app, shared, &new_text);
+    Ok(crate::apply::ApplyResult { method: crate::apply::Method::Panel, new_text })
+}
+
+#[tauri::command]
+pub fn check_text(app: AppHandle, state: State<'_, Shared>, text: String) {
+    check_text_inner(&app, &state, &text);
+}
+
 pub fn accept_alert_inner(app: &AppHandle, shared: &Shared, id: &str, suggestion: usize) -> Result<crate::apply::ApplyResult, String> {
     let alert: Alert = {
         let st = shared.lock().unwrap();
         st.alerts.iter().find(|a| a.id == id).cloned().ok_or("That suggestion is no longer available.")?
     };
     let replacement = alert.suggestions.get(suggestion).cloned().ok_or("This suggestion has no automatic fix.")?;
+    if shared.lock().unwrap().doc.as_ref().map(|d| d.id == SCRATCH_ID).unwrap_or(false) {
+        return accept_scratch(app, shared, &alert, &replacement);
+    }
     let (doc, el) = doc_snapshot(shared).ok_or("No text field is connected.")?;
     let res = crate::apply::replace_range(&el, doc.pid, alert.u16_start, alert.u16_end - alert.u16_start, &replacement, &doc.text).map_err(err)?;
     // Update the model immediately so the panel does not flicker.

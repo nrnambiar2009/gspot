@@ -293,3 +293,6 @@ input, textarea, select { font: inherit; color: inherit; }
   position: absolute; background: #1f1f1f; border: 1px solid #3a3a3a; border-radius: 14px; padding: 12px 14px; width: 300px;
   box-shadow: 0 10px 30px rgba(0,0,0,.5); pointer-events: auto; color: #fff; font-family: var(--font-sans);
 }
+
+.scratch { width: 100%; min-height: 120px; margin: 8px 0 4px; padding: 10px 12px; resize: vertical; box-sizing: border-box; border: 1px solid #3a3a3a; border-radius: 8px; background: #1f1f1f; color: inherit; font: inherit; line-height: 1.5; }
+.scratch:focus { outline: none; border-color: #2cc9b6; }

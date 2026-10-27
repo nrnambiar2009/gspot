@@ -3,7 +3,7 @@ name = "grammarlama"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
-description = "GSpot — a local-first Grammarly-style writing assistant for macOS"
+description = "GSpot — a local-first Grammarly-style writing assistant for macOS and Linux"
 license = "MIT"
 
 [lib]

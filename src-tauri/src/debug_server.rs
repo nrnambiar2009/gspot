@@ -158,6 +158,11 @@ fn handle(app: &AppHandle, shared: &Shared, path: &str, args: Value) -> Result<V
             let alerts = std::panic::catch_unwind(|| crate::engine::Engine::new().check(&text)).map_err(|_| "engine panicked".to_string())?;
             Ok(json!({"alerts": alerts, "score": crate::score::compute(&text, &alerts)}))
         }
+        "/check" => {
+            let text = args["text"].as_str().ok_or("text required")?.to_string();
+            crate::commands::check_text_inner(app, shared, &text);
+            Ok(json!({"ok": true}))
+        }
         "/pause" => {
             let mut st = shared.lock().unwrap();
             st.paused = args["paused"].as_bool().unwrap_or(true);

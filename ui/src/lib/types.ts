@@ -14,7 +14,7 @@ export interface Alert {
   suggestions: string[]; priority: number; stable_hash: number;
 }
 
-export interface Status { trusted: boolean; frontmost: string; frontmost_bid: string; skipped: boolean; skip_built_in: boolean; has_doc: boolean; linting: boolean }
+export interface Status { trusted: boolean; frontmost: string; frontmost_bid: string; skipped: boolean; skip_built_in: boolean; has_doc: boolean; linting: boolean; scratch?: boolean }
 export interface SkipApp { bundle_id: string; name: string }
 
 export interface Score {
